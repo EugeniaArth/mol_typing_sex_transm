@@ -1,0 +1,76 @@
+---
+title: "Untitled"
+author: "Eugenia Nikonorova"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+ID_PubMLST <- read.csv("/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/ID_PubMLST.csv", head=TRUE, dec = ",", sep=";", stringsAsFactors=FALSE)
+List_Nikita <- read.csv("/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/List_Nikita.csv", head=TRUE, dec = ",", sep=";", stringsAsFactors=FALSE)
+ID_PubMLST <- as.data.frame(ID_PubMLST)
+library("xlsx")
+library(dplyr) 
+```
+
+```{r}
+# Combine the two columns
+ID_PubMLST$new_ID <- paste(ID_PubMLST$ID, ID_PubMLST$E_Ar, sep = "_")
+#заменяем в new_ID "/" yf "_" чтобы сошлись названия
+ID_PubMLST$new_ID <-gsub("/","_",ID_PubMLST$new_ID)
+ID_PubMLST$new_ID <-gsub("-","_",ID_PubMLST$new_ID)
+write.xlsx(ID_PubMLST, file = "ID_PubMLST.xlsx",  col.names = TRUE, row.names = TRUE, append = TRUE)
+
+```
+
+```{r}
+merged_df <- List_Nikita %>%
+  full_join(ID_PubMLST, by = c("new_ID" = "new_ID" ))
+
+#убираем строки где NA чтобы остались только те что у Никиты из ID и страны (его 2 столбца)
+DB_Chl.tr <- merged_df[!is.na(merged_df$Country.x), ]
+#нашла что есть дубликат
+length(unique(DB_Chl.tr[["new_ID"]]))
+DB_Chl.tr[duplicated(DB_Chl.tr$new_ID),]
+
+write.xlsx(DB_Chl.tr, file = "DB_Chl.tr.xlsx",  col.names = TRUE, row.names = TRUE, append = TRUE)
+```
+
+
+```{r}
+#extract Italy Run for prefetch
+# Load necessary library
+library(readxl)
+
+# Define the path to the Excel file
+file_path <- "/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/DB_Chl.tr.xlsx"
+# Read the data from the first sheet
+df <- read_excel(file_path, sheet = 1)
+# Filter the data for Italy
+italy_data <- df[df$Country.x == "Italy", ]
+country_data <- df[df$Country.x == "Russia", ]
+# Extract the Run column
+run_data <- country_data$Run
+
+# Remove NA values
+run_data <- na.omit(run_data)
+
+# Write the Run column data to a text file
+writeLines(as.character(run_data), "italy_run_data.txt")
+```
+
+
+
+
+```{r}
+library(readr)
+sra_ids <- read_lines("/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/italy_run_data.txt")
+
+# Remove any leading or trailing whitespace
+sra_ids <- trimws(sra_ids)
+# Remove any empty lines
+sra_ids <- sra_ids[sra_ids != ""]
+# Write the cleaned SRR IDs back to the file
+write_lines(sra_ids, "/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/sra_id_cleaned.txt")
+```
+
