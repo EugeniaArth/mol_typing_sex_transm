@@ -1,4 +1,4 @@
-
+#used to extract data about samples (downloaded from PubMLST in fasta format)
 
 import csv
 
