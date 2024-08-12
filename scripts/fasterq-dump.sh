@@ -7,10 +7,6 @@ export PATH=$HOME/sratoolkit.3.0.7-mac64/bin:$PATH
 
 cat ~/Genomes_mol_typing/Chlamydiales/sra_id_cleaned.txt | parallel "prefetch  -O ~/Genomes_mol_typing/Chlamydiales/SRA -p  {}"
 
-# Create a directory to store the resulting FASTQ files
-
-#mkdir -p Fastq
-
 # Loop through each directory containing .sra files
 for dir in */; do
     # Check if the directory contains .sra files
@@ -25,18 +21,14 @@ for dir in */; do
 
 echo fasterq-dump is performed for "$sra_file"
             # Rename the resulting FASTQ files based on the folder name gzip
-           gzip "~/Genomes_mol_typing/Chlamydiales/SRA/Fastq/${dirname}_1.fastq"
-           gzip "~/Genomes_mol_typing/Chlamydiales/SRA/Fastq/${dirname}_2.fastq"
+           gzip "~/Genomes_mol_typing/Chlamydiales/SRA/${dirname}_1.fastq"
+           gzip "~/Genomes_mol_typing/Chlamydiales/SRA/${dirname}_2.fastq"
 
 echo unzipped "$sra_file" is gzipped
 
 rm -r "${dir}"
 echo ${dir} is removed
 
-           #remove fastq
-        #   rm "Fastq/${dirname}_1.fastq"
-        #   rm "Fastq/${dirname}_2.fastq"
-#echo unzipped "$sra_file" is removed
 
         done
     fi
