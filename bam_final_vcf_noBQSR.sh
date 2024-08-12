@@ -64,14 +64,14 @@ echo INDEL extracted V for ${i}
 
 # Filter SNPs
   gatk --java-options "-Xmx4G" VariantFiltration -R Reference.fna -V ${i}.SNP.vcf \
- --filter-expression 'QUAL < 30.0 || QD < 2.0 || FS > 60.0 || DP < 10 ' \
+ --filter-expression 'QUAL < 30.0 || QD < 2.0 || FS > 60.0 || DP < 10 || AF < 0.25  ' \
  --filter-name lowQualFilter --cluster-window-size 10 --cluster-size 3 --missing-values-evaluate-as-failing \
   -O ${i}.snp.filtered.vcf
   echo SNPs filtration №1 is performed for ${i}
 
 #Filter Indels
 gatk --java-options "-Xmx4G" VariantFiltration -R Reference.fna -V ${i}.INDEL.vcf \
---filter-expression 'QUAL < 30.0 || QD < 2.0 || FS > 60.0 || DP < 10 ' \
+--filter-expression 'QUAL < 30.0 || QD < 2.0 || FS > 60.0 || DP < 10 || AF < 0.25 ' \
 --filter-name lowQualFilter --cluster-window-size 10 --cluster-size 3 --missing-values-evaluate-as-failing \
         -O ${i}.indels.filtered.vcf
 echo INDELs filtration №1 is performed for ${i}
