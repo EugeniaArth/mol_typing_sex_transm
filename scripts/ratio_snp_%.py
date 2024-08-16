@@ -9,9 +9,6 @@ def extract_protein_name(info):
     match = re.search(r"product=([^;]+)", info)
     return match.group(1) if match else None
 
-def calculate_gene_length(start, end):
-    return abs(int(end) - int(start))
-
 def process_summary(input_dir, summary_output_file, stats_output_file):
     # Initialize an empty list to hold the summary data
     summary_data = []
@@ -33,9 +30,6 @@ def process_summary(input_dir, summary_output_file, stats_output_file):
             for (gene_name, protein_name, start, end), counts in grouped.iterrows():
                 nonsynonymous_count = counts.get('nonsynonymous SNV', 0)
                 synonymous_count = counts.get('synonymous SNV', 0)
-                gene_length = calculate_gene_length(start, end)
-                n_of_nonsynonSNP_to_100bp = round((nonsynonymous_count / gene_length) * 100, 2) if gene_length > 0 else 0
-                n_of_synonSNP_to_100bp = round((synonymous_count / gene_length) * 100, 2) if gene_length > 0 else 0
 
                 if nonsynonymous_count == 0 and synonymous_count == 0:
                     ratio = "not applicable, single SNP"
@@ -45,50 +39,57 @@ def process_summary(input_dir, summary_output_file, stats_output_file):
                     ratio = nonsynonymous_count / synonymous_count
 
                 # Append the extracted data as a new row
-                summary_data.append([sample_name, gene_name, protein_name, start, end, gene_length, nonsynonymous_count, synonymous_count, n_of_nonsynonSNP_to_100bp, n_of_synonSNP_to_100bp, ratio])
+                summary_data.append([sample_name, gene_name, protein_name, start, end, ratio, nonsynonymous_count, synonymous_count])
                 if isinstance(ratio, (int, float)):
-                    ratio_data.append([sample_name, gene_name, protein_name, start, end, ratio, nonsynonymous_count, synonymous_count, gene_length, n_of_nonsynonSNP_to_100bp, n_of_synonSNP_to_100bp])
+                    ratio_data.append([sample_name, gene_name, protein_name, start, end, ratio, nonsynonymous_count, synonymous_count])
 
     # Create a DataFrame from the summary data
-    summary_columns = ["Sample name", "Gene name", "Protein name", "Start", "End", "Gene length", "Number_of_nonsynonSNP", "Number_of_synonSNP", "N_of_nonsynonSNP_to_100bp", "N_of_synonSNP_to_100bp", "Ratio"]
+    summary_columns = ["Sample name", "Gene name", "Protein name", "Start", "End", "Ratio", "nonsynSNP", "synSNP"]
     summary_df = pd.DataFrame(summary_data, columns=summary_columns)
 
     # Convert ratios to numeric where possible for sorting, handle non-numeric ratios separately
-    summary_df['Numeric Ratio'] = pd.to_numeric(summary_df['Ratio'], errors='coerce')
-    summary_df = summary_df.sort_values(by='Numeric Ratio', ascending=False, na_position='last').drop(columns=['Numeric Ratio'])
+    summary_df['Numeric ratio'] = pd.to_numeric(summary_df['Ratio'], errors='coerce')
+    summary_df = summary_df.sort_values(by='Numeric ratio', ascending=False, na_position='last').drop(columns=['Numeric ratio'])
 
     # Save the summary DataFrame to a CSV file
     summary_df.to_csv(summary_output_file, index=False)
     print(f"Summary table has been saved to {summary_output_file}.")
 
     # Create a DataFrame from the ratio data
-    ratio_columns = ["Sample name", "Gene name", "Protein name", "Start", "End", "Ratio", "Total nonsynonymous SNV", "Total synonymous SNV", "Gene length", "N_of_nonsynonSNP_to_100bp", "N_of_synonSNP_to_100bp"]
+    ratio_columns = ["Sample name", "Gene name", "Protein name", "Start", "End", "Ratio", "Total nonsynSNP", "Total synSNP"]
     ratio_df = pd.DataFrame(ratio_data, columns=ratio_columns)
 
     # Calculate statistics for each gene and protein combination
     stats_df = ratio_df.groupby(["Gene name", "Protein name", "Start", "End"]).agg(
-        Gene_length=('Gene length', 'mean'),
+        Mean_Ratio=('Ratio', lambda x: round(x.mean(), 2)),
+        SD=('Ratio', lambda x: round(x.std(), 2)),
         Sample_Count=('Ratio', 'count'),
-        Total_nonsynonymous_SNV=('Total nonsynonymous SNV', 'sum'),
-        Total_synonymous_SNV=('Total synonymous SNV', 'sum'),
-        Mean_N_of_nonsynonSNP_to_100bp=('N_of_nonsynonSNP_to_100bp', lambda x: round(x.mean(), 2)),
-        SD_of_nonsynonSNP_to_100bp=('N_of_nonsynonSNP_to_100bp', lambda x: round(x.std(), 2)),
-        Mean_N_of_synonSNP_to_100bp=('N_of_synonSNP_to_100bp', lambda x: round(x.mean(), 2)),
-        SD_of_synonSNP_to_100bp=('N_of_synonSNP_to_100bp', lambda x: round(x.std(), 2))
+        Total_nonsynSNP=('Total nonsynSNP', 'sum'),
+        Total_synSNP=('Total synSNP', 'sum')
     ).reset_index()
 
-    # Sort by Mean_N_of_nonsynonSNP_to_100bp column
-    stats_df = stats_df.sort_values(by='Mean_N_of_nonsynonSNP_to_100bp', ascending=False)
+    # Calculate the percentage of samples where the ratio was calculated
+    total_samples = len(ratio_df['Sample name'].unique())
+    stats_df['% of Samples with calculated Ratio'] = round((stats_df['Sample_Count'] / total_samples) * 100, 2)
+
+    # Calculate the percentage of samples with ratio >= mean
+    ratio_df = ratio_df.merge(stats_df[['Gene name', 'Protein name', 'Start', 'End', 'Mean_Ratio']], on=['Gene name', 'Protein name', 'Start', 'End'])
+    ratio_df['Ratio >= Mean_Ratio'] = ratio_df['Ratio'] >= ratio_df['Mean_Ratio']
+    percentage_df = ratio_df.groupby(["Gene name", "Protein name", "Start", "End"])['Ratio >= Mean_Ratio'].mean().reset_index()
+    percentage_df['Ratio >= Mean_Ratio'] = round(percentage_df['Ratio >= Mean_Ratio'] * 100, 2)
+
+    stats_df = stats_df.merge(percentage_df[['Gene name', 'Protein name', 'Start', 'End', 'Ratio >= Mean_Ratio']], on=['Gene name', 'Protein name', 'Start', 'End'])
+
+    # Sort by Mean_Ratio column
+    stats_df = stats_df.sort_values(by='Mean_Ratio', ascending=False)
 
     # Save the stats DataFrame to a CSV file
     stats_df.to_csv(stats_output_file, index=False)
     print(f"Statistics table has been saved to {stats_output_file}.")
 
-
-
 # Example usage
-input_dir = '/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/GATK4/analysis/Italy_noBQSR'  # Replace with the actual path to your directory containing the processed files
-summary_output_file = '/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/GATK4/analysis/Italy_noBQSR/summary_table.csv'  # Replace with the desired summary output file path
-stats_output_file = '/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/GATK4/analysis/Italy_noBQSR/stats_table.csv'  # Replace with the desired statistics output file path
+input_dir = '/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/GATK4/analysis/test'  # Replace with the actual path to your directory containing the processed files
+summary_output_file = '/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/GATK4/analysis/test/summary_table.csv'  # Replace with the desired summary output file path
+stats_output_file = '/Users/eugenianikonorova/Genomes_mol_typing/Chlamydiales/GATK4/analysis/test/stats_table.csv'  # Replace with the desired statistics output file path
 
 process_summary(input_dir, summary_output_file, stats_output_file)
