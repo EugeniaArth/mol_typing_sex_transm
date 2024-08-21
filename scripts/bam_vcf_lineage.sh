@@ -1,4 +1,9 @@
 #!/bin/bash
+#It use two references for snp calling and  annotation  depends on the lineage associated with exact sample 
+#(it use txt file mapping_data.txt with sample names and lineages). 
+#If the sample name  matched with lineage T1, T2 or T1-T2 the .vcf it should uses reference genome F_SW4; 
+#if the sample name matched with lineage LGV, L1, L2, or L3 -  reference genome L2_434_Bu. 
+#There are also two databases for annovar - cpdb_F_SW4 and cpdb_L2_434_Bu.
 
 # Update paths for BWA and GATK
 export PATH="/Users/eugenianikonorova/gatk-4.3.0.0/:$PATH"
